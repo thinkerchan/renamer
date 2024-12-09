@@ -1,0 +1,22 @@
+{
+  "name": "renamer",
+  "version": "1.0.0",
+  "description": "Rename media files based on EXIF creation date",
+  "main": "index.js",
+  "author": "chanthinker@foxmail.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thinkerchan/renamer.git"
+  },
+  "bin": {
+    "rename": "./cli.js"
+  },
+  "dependencies": {
+    "exif-reader": "^1.0.3",
+    "fast-glob": "^3.2.12",
+    "fs-extra": "^11.1.0",
+    "mime-types": "^2.1.35"
+  },
+  "type": "module",
+  "license": "MIT"
+}
