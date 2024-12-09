@@ -1,33 +1,13 @@
 import fs from 'fs-extra';
 import path from 'path';
 import glob from 'fast-glob';
-import ExifReader from 'exif-reader';
 
 async function extractExifDate(filePath) {
   try {
-    // 对于视频文件,直接使用文件创建时间,避免读取大文件
-    if (isVideoFile(path.extname(filePath))) {
-      const stats = await fs.stat(filePath);
-      return stats.birthtime;
-    }
-
-    const buffer = await fs.readFile(filePath);
-
-    // 读取 EXIF 数据
-    const exif = ExifReader(buffer);
-
-    if (exif && exif.exif && exif.exif.DateTimeOriginal) {
-      // 如果存在 EXIF 创建时间，返回日期对象
-      return new Date(exif.exif.DateTimeOriginal * 1000);
-    }
-
-    // 如果没有 EXIF 数据，返回文件创建时间
     const stats = await fs.stat(filePath);
     return stats.birthtime;
   } catch (error) {
-    // 如果读取失败，返回文件创建时间
-    const stats = await fs.stat(filePath);
-    return stats.birthtime;
+    throw new Error(`无法获取文件创建时间: ${error.message}`);
   }
 }
 
@@ -108,16 +88,10 @@ async function renameDirectory(directory) {
 
 function isMediaFile(ext) {
   const supportedExtensions = [
-    '.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi'
+    '.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.3gp', '.webm', '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.wma'
   ];
   return supportedExtensions.includes(ext.toLowerCase());
 }
 
-function isVideoFile(ext) {
-  const videoExtensions = [
-    '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.3gp', '.webm'
-  ];
-  return videoExtensions.includes(ext.toLowerCase());
-}
 
 export { renameMedia };
