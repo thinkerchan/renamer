@@ -19,7 +19,7 @@
 ## 安装
 
 ```bash
-npm install -g file-renamer
+npm install -g files-renamer
 ```
 
 ## 使用
