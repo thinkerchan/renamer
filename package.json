@@ -1,6 +1,6 @@
 {
   "name": "files-renamer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Rename media files quickly",
   "main": "index.js",
   "author": "chanthinker@foxmail.com",
