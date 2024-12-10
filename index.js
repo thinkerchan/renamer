@@ -2,10 +2,23 @@ import fs from 'fs-extra';
 import path from 'path';
 import glob from 'fast-glob';
 
+const supportedExtensions = {
+  IMG: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'tiff', 'tif', 'bmp', 'raw', 'arw', 'cr2', 'nef'],
+  VIDEO: ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', '3gp', 'webm'],
+  AUDIO: ['mp3', 'wav', 'aac', 'ogg', 'm4a', 'wma']
+};
+
+// 缓存扁平化的扩展名列表
+const flattenedExtensions = Object.values(supportedExtensions).flat();
+
 async function extractExifDate(filePath) {
   try {
     const stats = await fs.stat(filePath);
-    return stats.birthtime;
+    const ext = path.extname(filePath).toLowerCase();
+    return {
+      time: stats.birthtime,
+      ext
+    };
   } catch (error) {
     throw new Error(`无法获取文件创建时间: ${error.message}`);
   }
@@ -18,7 +31,6 @@ function formatDateTime(date) {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const seconds = String(date.getSeconds()).padStart(2, '0');
-
   return `${year}${month}${day}_${hours}${minutes}${seconds}`;
 }
 
@@ -26,15 +38,13 @@ async function renameMedia(targetPath) {
   const stats = await fs.stat(targetPath);
 
   if (stats.isFile()) {
-    // 处理单个文件
-    const ext = path.extname(targetPath);
+    const { ext } = await extractExifDate(targetPath);
     if (isMediaFile(ext)) {
       await renameSingleFile(targetPath);
     } else {
       console.warn(`跳过非媒体文件: ${targetPath}`);
     }
   } else if (stats.isDirectory()) {
-    // 处理目录
     await renameDirectory(targetPath);
   } else {
     throw new Error(`无效的路径: ${targetPath}`);
@@ -43,55 +53,49 @@ async function renameMedia(targetPath) {
 
 async function renameSingleFile(filePath) {
   const dir = path.dirname(filePath);
-  const ext = path.extname(filePath);
 
   try {
-    const date = await extractExifDate(filePath);
-    const dateString = formatDateTime(date);
+    const { time, ext } = await extractExifDate(filePath);
+    const dateString = formatDateTime(time);
 
-    // 生成新文件名
-    const newFileName = `IMG_${dateString}${ext.toLowerCase()}`;
+    const prefix = Object.keys(supportedExtensions).find(key =>
+      supportedExtensions[key].includes(ext.slice(1).toLowerCase())
+    );
+
+    if (!prefix) {
+      throw new Error(`不支持的文件类型: ${ext}`);
+    }
+
+    const newFileName = `${prefix}_${dateString}${ext.toLowerCase()}`;
     const newFilePath = path.join(dir, newFileName);
 
-    // 如果新文件名与原文件名不同，则重命名
+    if (await fs.pathExists(newFilePath)) {
+      throw new Error(`目标文件已存在: ${newFileName}`);
+    }
+
     if (filePath !== newFilePath) {
-      await fs.move(filePath, newFilePath, { overwrite: false });
-      console.log(`重命名: ${path.basename(filePath)} -> ${newFileName}`);
+      await fs.move(filePath, newFilePath);
+      console.log(`✅ 重命名成功: ${path.basename(filePath)} -> ${newFileName}`);
+    } else {
+      console.log(`⏭️ 跳过: 文件名相同`);
     }
   } catch (error) {
-    console.error(`处理 ${filePath} 时出错: ${error.message}`);
+    console.error(`❌ 处理 ${filePath} 时出错: ${error.message}`);
   }
 }
 
 async function renameDirectory(directory) {
-  // 支持的文件类型
-  const supportedExtensions = [
-     // 图片格式
-     'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'tiff', 'tif', 'bmp', 'raw', 'arw', 'cr2', 'nef',
-     // 视频格式
-     'mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', '3gp', 'webm',
-     // 音频格式
-     'mp3', 'wav', 'aac', 'ogg', 'm4a', 'wma'
-  ];
-
-  // 只查找当前目录下的媒体文件（不包含子目录）
-  const files = await glob(`*.{${supportedExtensions.join(',')}}`, {
+  const files = await glob(`*.{${flattenedExtensions.join(',')}}`, {
     cwd: directory,
     caseSensitiveMatch: false,
     absolute: true
   });
 
-  for (const file of files) {
-    await renameSingleFile(file);
-  }
+  await Promise.all(files.map(file => renameSingleFile(file)));
 }
 
 function isMediaFile(ext) {
-  const supportedExtensions = [
-    '.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.3gp', '.webm', '.mp3', '.wav', '.aac', '.ogg', '.m4a', '.wma'
-  ];
-  return supportedExtensions.includes(ext.toLowerCase());
+  return flattenedExtensions.includes(ext.slice(1).toLowerCase());
 }
-
 
 export { renameMedia };

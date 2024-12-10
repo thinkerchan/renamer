@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 async function main() {
   const args = process.argv.slice(2);
@@ -21,7 +20,7 @@ async function main() {
 
   try {
     await renameMedia(absolutePath);
-    console.log('重命名完成');
+    console.log('执行完毕');
   } catch (error) {
     console.error('错误:', error.message);
     process.exit(1);
