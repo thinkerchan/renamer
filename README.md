@@ -9,6 +9,7 @@
 - 支持单个文件或整个目录的处理
 - 文件名格式: `类型_年月日_时分秒.扩展名`
 - 自动跳过非媒体文件
+- 支持自定义文件名前缀
 
 ## 支持的文件格式
 
@@ -28,4 +29,5 @@ npm install -g files-renamer
 rename . # 重命名当前目录下的所有媒体文件
 rename photos # 重命名 photos 目录下的所有媒体文件
 rename image.jpg # 重命名单个文件
+rename -p Test  photos # 可以指定前缀
 ```

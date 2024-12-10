@@ -1,6 +1,6 @@
 {
   "name": "files-renamer",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Rename media files quickly",
   "main": "index.js",
   "author": "chanthinker@foxmail.com",
@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "fast-glob": "^3.2.12",
-    "fs-extra": "^11.1.0"
+    "fs-extra": "^11.1.0",
+    "minimist": "^1.2.8"
   },
   "type": "module",
   "license": "MIT"

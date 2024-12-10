@@ -34,39 +34,40 @@ function formatDateTime(date) {
   return `${year}${month}${day}_${hours}${minutes}${seconds}`;
 }
 
-async function renameMedia(targetPath) {
+async function renameMedia(targetPath, usePrefix = '') {
   const stats = await fs.stat(targetPath);
 
   if (stats.isFile()) {
     const { ext } = await extractExifDate(targetPath);
     if (isMediaFile(ext)) {
-      await renameSingleFile(targetPath);
+      await renameSingleFile(targetPath, usePrefix);
     } else {
       console.warn(`跳过非媒体文件: ${targetPath}`);
     }
   } else if (stats.isDirectory()) {
-    await renameDirectory(targetPath);
+    await renameDirectory(targetPath, usePrefix);
   } else {
     throw new Error(`无效的路径: ${targetPath}`);
   }
 }
 
-async function renameSingleFile(filePath) {
+async function renameSingleFile(filePath, usePrefix = '') {
   const dir = path.dirname(filePath);
 
   try {
     const { time, ext } = await extractExifDate(filePath);
     const dateString = formatDateTime(time);
 
-    const prefix = Object.keys(supportedExtensions).find(key =>
+    const defaultPrefix = Object.keys(supportedExtensions).find(key =>
       supportedExtensions[key].includes(ext.slice(1).toLowerCase())
     );
 
-    if (!prefix) {
+    if (!defaultPrefix) {
       throw new Error(`不支持的文件类型: ${ext}`);
     }
 
-    const newFileName = `${prefix}_${dateString}${ext.toLowerCase()}`;
+    const finalPrefix = usePrefix || defaultPrefix;
+    const newFileName = `${finalPrefix}_${dateString}${ext.toLowerCase()}`;
     const newFilePath = path.join(dir, newFileName);
 
     if (await fs.pathExists(newFilePath)) {
@@ -84,14 +85,14 @@ async function renameSingleFile(filePath) {
   }
 }
 
-async function renameDirectory(directory) {
+async function renameDirectory(directory, usePrefix = '') {
   const files = await glob(`*.{${flattenedExtensions.join(',')}}`, {
     cwd: directory,
     caseSensitiveMatch: false,
     absolute: true
   });
 
-  await Promise.all(files.map(file => renameSingleFile(file)));
+  await Promise.all(files.map(file => renameSingleFile(file, usePrefix)));
 }
 
 function isMediaFile(ext) {
