@@ -6,7 +6,7 @@
   "author": "chanthinker@foxmail.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thinkerchan/renamer.git"
+    "url": "https://github.com/thinkerchan/files-renamer.git"
   },
   "bin": {
     "rename": "./cli.js"
