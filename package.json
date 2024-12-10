@@ -1,5 +1,5 @@
 {
-  "name": "file-renamer",
+  "name": "files-renamer",
   "version": "1.0.0",
   "description": "Rename media files based on EXIF creation date",
   "main": "index.js",
