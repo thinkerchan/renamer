@@ -1,10 +1,6 @@
 #!/usr/bin/env node
 import { renameMedia } from './index.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
 
 async function main() {
   const args = process.argv.slice(2);
