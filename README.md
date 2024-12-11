@@ -30,4 +30,5 @@ rename . # 重命名当前目录下的所有媒体文件
 rename photos # 重命名 photos 目录下的所有媒体文件
 rename image.jpg # 重命名单个文件
 rename -p Test  photos # 可以指定前缀
+rename . -e true # 使用exif信息的创建时间
 ```
