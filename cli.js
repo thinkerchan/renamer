@@ -6,11 +6,14 @@ import minimist from 'minimist';
 async function main() {
   const argv = minimist(process.argv.slice(2), {
     string: ['p'],
+    boolean: ['e'],
     alias: {
-      p: 'prefix'
+      p: 'prefix',
+      e: 'exif'
     },
     default: {
-      p: ''
+      p: '',
+      e: false
     }
   });
 
@@ -26,7 +29,7 @@ async function main() {
   const absolutePath = path.resolve(process.cwd(), target);
 
   try {
-    await renameMedia(absolutePath, argv.prefix || '');
+    await renameMedia(absolutePath, argv.prefix || '', argv.exif || false);
     console.log('执行完毕');
   } catch (error) {
     console.error('错误:', error.message);
