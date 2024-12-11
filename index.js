@@ -155,4 +155,61 @@ function isMediaFile(ext) {
   return flattenedExtensions.includes(ext.slice(1).toLowerCase());
 }
 
-export { renameMedia };
+async function renameWxFile(directory) {
+  // 处理微信导出的媒体文件，将时间戳转换为日期格式
+  const wxFilePattern = /^mmexport(\d+)\./i;
+
+  if (!directory) {
+    throw new Error('请提供有效的目录路径');
+  }
+
+  const files = await fs.readdir(directory);
+  const results = [];
+
+  for (const file of files) {
+    const match = file.match(wxFilePattern);
+    if (!match) continue;
+
+    const filePath = path.join(directory, file);
+    const timestamp = parseInt(match[1]);
+    const date = new Date(timestamp);
+
+    // 格式化日期为 YYYYMMDD_HHMMSS
+    const dateString = date.toISOString()
+      .replace(/[-:]/g, '')
+      .replace('T', '_')
+      .slice(0, 15);
+
+    const ext = path.extname(file);
+    const newFileName = `mmexport_${dateString}${ext}`;
+    const newFilePath = path.join(directory, newFileName);
+
+    try {
+      if (await fs.pathExists(newFilePath)) {
+        let version = 1;
+        let versionedFilePath;
+
+        do {
+          const versionedFileName = `${dateString}_${version}${ext}`;
+          versionedFilePath = path.join(directory, versionedFileName);
+          version++;
+        } while (await fs.pathExists(versionedFilePath));
+
+        await fs.move(filePath, versionedFilePath);
+        console.log(`✅ 重命名成功(添加版本号): ${file} -> ${path.basename(versionedFilePath)}`);
+        results.push({success: true, file, newName: path.basename(versionedFilePath)});
+      } else {
+        await fs.move(filePath, newFilePath);
+        console.log(`✅ 重命名成功: ${file} -> ${newFileName}`);
+        results.push({success: true, file, newName: newFileName});
+      }
+    } catch (error) {
+      console.error(`❌ 处理 ${file} 时出错: ${error.message}`);
+      results.push({success: false, file, error: error.message});
+    }
+  }
+
+  return results;
+}
+
+export { renameMedia, renameWxFile };

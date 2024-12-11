@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-import { renameMedia } from './index.js';
+import { renameMedia,renameWxFile } from './index.js';
 import path from 'path';
 import minimist from 'minimist';
 
 async function main() {
   const argv = minimist(process.argv.slice(2), {
     string: ['p'],
-    boolean: ['e'],
+    boolean: ['e','m'],
     alias: {
       p: 'prefix',
-      e: 'exif'
+      e: 'exif',
+      m:'modify'
     },
     default: {
       p: '',
-      e: false
+      e: false,
+      m: false,
     }
   });
 
@@ -25,8 +27,15 @@ async function main() {
     process.exit(1);
   }
 
+
+
   const target = targets[0];
   const absolutePath = path.resolve(process.cwd(), target);
+
+  if (argv.m) {
+    renameWxFile(absolutePath)
+    return;
+  }
 
   try {
     await renameMedia(absolutePath, argv.prefix || '', argv.exif || false);
