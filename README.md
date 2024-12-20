@@ -7,7 +7,7 @@
 - 支持批量重命名图片、视频和音频文件
 - 根据文件创建时间自动生成新文件名
 - 支持单个文件或整个目录的处理
-- 文件名格式: `类型_年月日_时分秒.扩展名`
+- 文件名格式: `类型_年月日_时分秒_版本.扩展名`
 - 自动跳过非媒体文件
 - 支持自定义文件名前缀
 
@@ -26,9 +26,12 @@ npm install -g files-renamer
 ## 使用
 
 ```bash
-rename . # 重命名当前目录下的所有媒体文件
-rename photos # 重命名 photos 目录下的所有媒体文件
-rename image.jpg # 重命名单个文件
-rename -p Test  photos # 可以指定前缀
-rename . -e true # 使用exif信息的创建时间
+  renamer .              重命名目录下所有支持的媒体文件
+  renamer . -p STR       自定义前缀
+  renamer . -e           使用EXIF信息重命名图片
+  renamer . -m          重命名微信导出的文件
+  # 以上操作都会记录重命名记录到renamer_history.txt
+
+  renamer . -r                   恢复所有文件到原始文件名
+  # 恢复所有文件到原始文件名，会清除renamer_history.txt内对应记录直到为空
 ```

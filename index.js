@@ -24,13 +24,98 @@ const supportedExtensions = {
   AUDIO: ['mp3', 'wav', 'aac', 'ogg', 'm4a', 'wma']
 };
 
+const CONFIG = {
+  overwrite: false
+};
+
+const CACHE_FILE = 'renamer_history.txt';
+
 const flattenedExtensions = Object.values(supportedExtensions).flat();
 
+// 文件操作相关的工具函数
+const FileUtils = {
+  async checkAndMove(sourcePath, targetPath) {
+    if (await fs.pathExists(targetPath)) {
+      throw Object.assign(new Error('目标文件已存在'), { code: 'EEXIST' });
+    }
+    await fs.move(sourcePath, targetPath, CONFIG);
+    // 记录重命名记录到历史文件
+    await this.saveToCache(sourcePath, targetPath);
+  },
+
+  async validatePath(path) {
+    if (!path) {
+      throw new Error('路径不能为空');
+    }
+    return await fs.stat(path);
+  },
+
+  isMediaFile(ext) {
+    if (!ext) return false;
+    return flattenedExtensions.includes(ext.slice(1).toLowerCase());
+  },
+
+  async saveToCache(oldPath, newPath) {
+    const cacheEntry = `${oldPath}|${newPath}\n`;
+    await fs.appendFile(CACHE_FILE, cacheEntry, 'utf8');
+  },
+
+  async loadCache() {
+    try {
+      if (await fs.pathExists(CACHE_FILE)) {
+        const content = await fs.readFile(CACHE_FILE, 'utf8');
+        return content.split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            const [oldPath, newPath] = line.split('|');
+            return { oldPath, newPath };
+          });
+      }
+      return [];
+    } catch (error) {
+      console.error('读取历史文件失败:', error);
+      return [];
+    }
+  }
+};
+
+// 日期处理相关的工具函数
+const DateUtils = {
+  formatDateTime(date) {
+    if (!(date instanceof Date) || isNaN(date)) {
+      throw new Error('无效的日期');
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const random = Math.random().toString(36).substring(2, 4);
+    return `${year}${month}${day}_${hours}${minutes}${seconds}_${random}`;
+  },
+
+  formatWxDateTime(date) {
+    return date.toISOString()
+      .replace(/[-:]/g, '')
+      .replace('T', '_')
+      .slice(0, 15);
+  }
+};
+
 async function extractExifDate(filePath, useExif = false) {
+  if (!filePath) {
+    throw new Error('文件路径不能为空');
+  }
+
   if (useExif) {
-    const exifDate = await getExifCreationDate(filePath);
-    if (exifDate) {
-      return { time: exifDate, ext: path.extname(filePath).toLowerCase() };
+    const ext = path.extname(filePath).toLowerCase();
+    if (supportedExtensions.IMG.includes(ext.slice(1))) {
+      const exifDate = await getExifCreationDate(filePath);
+      if (exifDate) {
+        return { time: exifDate, ext };
+      }
     }
   }
 
@@ -38,7 +123,7 @@ async function extractExifDate(filePath, useExif = false) {
     const stats = await fs.stat(filePath);
     const ext = path.extname(filePath).toLowerCase();
     return {
-      time: stats.birthtime,
+      time: stats.birthtime.getTime() === 0 ? stats.mtime : stats.birthtime,
       ext
     };
   } catch (error) {
@@ -46,48 +131,34 @@ async function extractExifDate(filePath, useExif = false) {
   }
 }
 
-function formatDateTime(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const random = Math.random().toString(36).substring(2, 4);
-  return `${year}${month}${day}_${hours}${minutes}${seconds}_${random}`;
-}
-
 async function renameMedia(targetPath, usePrefix = '', useExif = false) {
-  if (!targetPath) {
-    throw new Error('请提供有效的目标路径');
-  }
+  try {
+    const stats = await FileUtils.validatePath(targetPath);
 
-  const stats = await fs.stat(targetPath);
-
-  if (stats.isFile()) {
-    const { ext } = await extractExifDate(targetPath, useExif);
-    if (isMediaFile(ext)) {
-      await renameSingleFile(targetPath, usePrefix, useExif);
+    if (stats.isFile()) {
+      const ext = path.extname(targetPath);
+      if (FileUtils.isMediaFile(ext)) {
+        await renameSingleFile(targetPath, usePrefix, useExif);
+      } else {
+        console.warn(`跳过非媒体文件: ${targetPath}`);
+      }
+    } else if (stats.isDirectory()) {
+      await renameDirectory(targetPath, usePrefix, useExif);
     } else {
-      console.warn(`跳过非媒体文件: ${targetPath}`);
+      throw new Error(`无效的路径: ${targetPath}`);
     }
-  } else if (stats.isDirectory()) {
-    await renameDirectory(targetPath, usePrefix, useExif);
-  } else {
-    throw new Error(`无效的路径: ${targetPath}`);
+  } catch (error) {
+    throw new Error(`处理路径失败: ${error.message}`);
   }
 }
 
 async function renameSingleFile(filePath, usePrefix = '', useExif = false) {
-  if (!filePath) {
-    throw new Error('请提供有效的文件路径');
-  }
-
+  await FileUtils.validatePath(filePath);
   const dir = path.dirname(filePath);
 
   try {
     const { time, ext } = await extractExifDate(filePath, useExif);
-    const dateString = formatDateTime(time);
+    const dateString = DateUtils.formatDateTime(time);
     const extLower = ext.toLowerCase();
 
     const defaultPrefix = Object.keys(supportedExtensions).find(key =>
@@ -106,110 +177,138 @@ async function renameSingleFile(filePath, usePrefix = '', useExif = false) {
       return;
     }
 
-    if (await fs.pathExists(newFilePath)) {
-      let version = 1;
-      let versionedFilePath;
-
-      do {
-        const versionedFileName = `${finalPrefix}_${dateString}_${version}${extLower}`;
-        versionedFilePath = path.join(dir, versionedFileName);
-        version++;
-      } while (await fs.pathExists(versionedFilePath));
-
-      await fs.move(filePath, versionedFilePath);
-      console.log(`✅ 重命名成功(添加版本号): ${path.basename(filePath)} -> ${path.basename(versionedFilePath)}`);
-      return;
-    }
-
-    await fs.move(filePath, newFilePath);
+    await FileUtils.checkAndMove(filePath, newFilePath);
     console.log(`✅ 重命名成功: ${path.basename(filePath)} -> ${newFileName}`);
 
   } catch (error) {
-    console.error(`❌ 处理 ${filePath} 时出错: ${error.message}`);
+    if (error.code === 'EEXIST') {
+      console.error(`❌ 文件 ${filePath} 重命名失败: 目标文件已存在`);
+    } else {
+      console.error(`❌ 处理 ${filePath} 时出错: ${error.message}`);
+    }
     throw error;
   }
 }
 
 async function renameDirectory(directory, usePrefix = '', useExif = false) {
-  if (!directory) {
-    throw new Error('请提供有效的目录路径');
+  await FileUtils.validatePath(directory);
+
+  try {
+    const files = await glob(`*.{${flattenedExtensions.join(',')}}`, {
+      cwd: directory,
+      caseSensitiveMatch: false,
+      absolute: true
+    });
+
+    const results = await Promise.allSettled(
+      files.map(file => renameSingleFile(file, usePrefix, useExif))
+    );
+
+    const failures = results.filter(result => result.status === 'rejected');
+    if (failures.length > 0) {
+      console.error(`有 ${failures.length} 个文件处理失败`);
+      failures.forEach(failure => {
+        console.error(`失败原因: ${failure.reason.message}`);
+      });
+    }
+  } catch (error) {
+    throw new Error(`处理目录失败: ${error.message}`);
   }
-
-  const files = await glob(`*.{${flattenedExtensions.join(',')}}`, {
-    cwd: directory,
-    caseSensitiveMatch: false,
-    absolute: true
-  });
-
-  const results = await Promise.allSettled(
-    files.map(file => renameSingleFile(file, usePrefix, useExif))
-  );
-
-  const failures = results.filter(result => result.status === 'rejected');
-  if (failures.length > 0) {
-    console.error(`有 ${failures.length} 个文件处理失败`);
-  }
-}
-
-function isMediaFile(ext) {
-  return flattenedExtensions.includes(ext.slice(1).toLowerCase());
 }
 
 async function renameWxFile(directory) {
-  // 处理微信导出的媒体文件，将时间戳转换为日期格式
+  await FileUtils.validatePath(directory);
+
   const wxFilePattern = /^mmexport(\d+)\./i;
-
-  if (!directory) {
-    throw new Error('请提供有效的目录路径');
-  }
-
-  const files = await fs.readdir(directory);
   const results = [];
 
-  for (const file of files) {
-    const match = file.match(wxFilePattern);
-    if (!match) continue;
+  try {
+    const files = await fs.readdir(directory);
 
-    const filePath = path.join(directory, file);
-    const timestamp = parseInt(match[1]);
-    const date = new Date(timestamp);
+    for (const file of files) {
+      const match = file.match(wxFilePattern);
+      if (!match) continue;
 
-    // 格式化日期为 YYYYMMDD_HHMMSS
-    const dateString = date.toISOString()
-      .replace(/[-:]/g, '')
-      .replace('T', '_')
-      .slice(0, 15);
+      const filePath = path.join(directory, file);
+      const timestamp = parseInt(match[1]);
 
-    const ext = path.extname(file);
-    const newFileName = `mmexport_${dateString}${ext}`;
-    const newFilePath = path.join(directory, newFileName);
+      if (isNaN(timestamp)) {
+        console.warn(`无效的时间戳: ${file}`);
+        continue;
+      }
 
-    try {
-      if (await fs.pathExists(newFilePath)) {
-        let version = 1;
-        let versionedFilePath;
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        console.warn(`无效的日期: ${file}`);
+        continue;
+      }
 
-        do {
-          const versionedFileName = `${dateString}_${version}${ext}`;
-          versionedFilePath = path.join(directory, versionedFileName);
-          version++;
-        } while (await fs.pathExists(versionedFilePath));
+      const dateString = DateUtils.formatWxDateTime(date);
+      const random = Math.random().toString(36).substring(2, 4);
+      const ext = path.extname(file);
+      const newFileName = `mmexport_${dateString}_${random}${ext}`;
+      const newFilePath = path.join(directory, newFileName);
 
-        await fs.move(filePath, versionedFilePath);
-        console.log(`✅ 重命名成功(添加版本号): ${file} -> ${path.basename(versionedFilePath)}`);
-        results.push({success: true, file, newName: path.basename(versionedFilePath)});
-      } else {
-        await fs.move(filePath, newFilePath);
+      try {
+        await FileUtils.checkAndMove(filePath, newFilePath);
         console.log(`✅ 重命名成功: ${file} -> ${newFileName}`);
         results.push({success: true, file, newName: newFileName});
+      } catch (error) {
+        if (error.code === 'EEXIST') {
+          console.error(`❌ 文件 ${file} 重命名失败: 目标文件已存在`);
+        } else {
+          console.error(`❌ 处理 ${file} 时出错: ${error.message}`);
+        }
+        results.push({success: false, file, error: error.message});
       }
-    } catch (error) {
-      console.error(`❌ 处理 ${file} 时出错: ${error.message}`);
-      results.push({success: false, file, error: error.message});
     }
-  }
 
-  return results;
+    return results;
+  } catch (error) {
+    throw new Error(`处理目录失败: ${error.message}`);
+  }
 }
 
-export { renameMedia, renameWxFile };
+async function resetAllFiles() {
+  try {
+    const cacheEntries = await FileUtils.loadCache();
+    if (cacheEntries.length === 0) {
+      console.log('没有找到历史记录，无法恢复文件名');
+      return;
+    }
+
+    const successfullyRestored = [];
+
+    for (const entry of cacheEntries) {
+      try {
+        if (await fs.pathExists(entry.newPath)) {
+          await fs.move(entry.newPath, entry.oldPath, { overwrite: true });
+          console.log(`✅ 已恢复文件名: ${path.basename(entry.newPath)} -> ${path.basename(entry.oldPath)}`);
+          successfullyRestored.push(entry);
+        } else {
+          console.warn(`⚠️ 文件不存在，无法恢复: ${entry.newPath}`);
+        }
+      } catch (error) {
+        console.error(`❌ 恢复文件名失败: ${entry.newPath}`, error);
+      }
+    }
+
+    // 从历史中移除已成功恢复的条目
+    const remainingEntries = cacheEntries.filter(entry =>
+      !successfullyRestored.some(restored =>
+        restored.oldPath === entry.oldPath && restored.newPath === entry.newPath
+      )
+    );
+
+    // 更新历史文件
+    await fs.writeFile(CACHE_FILE, remainingEntries.map(entry =>
+      `${entry.oldPath}|${entry.newPath}`
+    ).join('\n'));
+
+    console.log('✅ 所有文件恢复完成');
+  } catch (error) {
+    throw new Error(`恢复文件名失败: ${error.message}`);
+  }
+}
+
+export { renameMedia, renameWxFile, resetAllFiles };

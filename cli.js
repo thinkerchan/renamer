@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { renameMedia,renameWxFile } from './index.js';
+import { renameMedia,renameWxFile,resetAllFiles } from './index.js';
 import path from 'path';
 import minimist from 'minimist';
 
@@ -10,12 +10,14 @@ async function main() {
     alias: {
       p: 'prefix',
       e: 'exif',
-      m:'modify'
+      m:'modify',
+      r:'reset'
     },
     default: {
       p: '',
       e: false,
       m: false,
+      r:false
     }
   });
 
@@ -37,6 +39,11 @@ async function main() {
     return;
   }
 
+  if (argv.r) {
+    resetAllFiles(absolutePath)
+    return;
+  }
+
   try {
     await renameMedia(absolutePath, argv.prefix || '', argv.exif || false);
     console.log('执行完毕');
@@ -47,13 +54,22 @@ async function main() {
 }
 
 function showHelp() {
-  console.log('使用方法: rename [选项] <目标路径>');
-  console.log('选项:');
-  console.log('  -p, --prefix <前缀>  设置文件名前缀');
-  console.log('示例:');
-  console.log('  rename .                     # 重命名当前目录下的所有媒体文件');
-  console.log('  rename -p IMG photos         # 重命名 photos 目录下的所有媒体文件，添加前缀 IMG');
-  console.log('  rename --prefix TEST image.jpg  # 重命名单个文件，添加前缀 TEST');
+  console.log(`
+使用方法: renamer [选项] <目标路径>
+
+选项:
+  -p, --prefix   指定文件名前缀,默认根据文件类型自动选择(IMG/VIDEO/AUDIO)
+  -e, --exif     使用EXIF信息中的拍摄时间重命名(仅对图片有效)
+  -m, --modify   重命名微信导出的文件(mmexport开头)
+  -r, --reset    恢复所有文件到原始文件名
+
+示例:
+  renamer .              重命名目录下所有支持的媒体文件
+  renamer . -p STR      自定义前缀
+  renamer . -e          使用EXIF信息重命名图片
+  renamer . -m         重命名微信导出的文件
+  renamer . -r         恢复所有文件到原始文件名
+`);
 }
 
 main();
