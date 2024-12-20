@@ -55,7 +55,7 @@ async function main() {
 
 function showHelp() {
   console.log(`
-使用方法: renamer [选项] <目标路径>
+使用方法: rename [选项] <目标路径>
 
 选项:
   -p, --prefix   指定文件名前缀,默认根据文件类型自动选择(IMG/VIDEO/AUDIO)
@@ -64,11 +64,11 @@ function showHelp() {
   -r, --reset    恢复所有文件到原始文件名
 
 示例:
-  renamer .              重命名目录下所有支持的媒体文件
-  renamer . -p STR      自定义前缀
-  renamer . -e          使用EXIF信息重命名图片
-  renamer . -m         重命名微信导出的文件
-  renamer . -r         恢复所有文件到原始文件名
+  rename .              重命名目录下所有支持的媒体文件
+  rename . -p STR      自定义前缀
+  rename . -e          使用EXIF信息重命名图片
+  rename . -m         重命名微信导出的文件
+  rename . -r         恢复所有文件到原始文件名
 `);
 }
 

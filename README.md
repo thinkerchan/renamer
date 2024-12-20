@@ -26,13 +26,13 @@ npm install -g files-renamer
 ## 使用
 
 ```bash
-  renamer .              重命名目录下所有支持的媒体文件
-  renamer . -p STR       自定义前缀
-  renamer . -e           使用EXIF信息重命名图片
-  renamer . -m          重命名微信导出的文件
+  rename .              重命名目录下所有支持的媒体文件
+  rename . -p STR       自定义前缀
+  rename . -e           使用EXIF信息重命名图片
+  rename . -m          重命名微信导出的文件
   # 以上操作都会记录重命名记录到renamer_history.txt
 
-  renamer . -r                   恢复所有文件到原始文件名
+  rename . -r                   恢复所有文件到原始文件名
   # 恢复所有文件到原始文件名，会清除renamer_history.txt内对应记录直到为空
 ```
 
